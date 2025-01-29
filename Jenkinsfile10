@@ -1,0 +1,40 @@
+pipeline {
+    agent {
+        label 'python-node'
+    }
+    environment {
+        dockerImageTag = "${env.BUILD_NUMBER}"
+        ECR_REGISTRY = "248189914395.dkr.ecr.us-east-1.amazonaws.com/ecr_repo"
+        HOST_PORT = "9092"
+        CONTAINER_PORT = "8080"
+
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/venugopalsgnew/jenkins_ecr_repo_python.git']])
+            }
+        }
+        stage('Building Docker image') {
+            steps {
+                sh 'docker build -t "${ECR_REGISTRY}:${dockerImageTag}" . '
+            }
+        }
+        stage('Pushing Image to ECR Registry') {
+            steps {
+                sh 'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 248189914395.dkr.ecr.us-east-1.amazonaws.com'
+                sh 'docker push ${ECR_REGISTRY}:${dockerImageTag}'
+            }
+        }
+        stage('Run Docker Container') {
+            steps {
+                sh 'docker pull ${ECR_REGISTRY}:${dockerImageTag}'
+                sh 'docker run -d -p ${HOSTPORT}:${CONTAINER_PORT} --name container1 ${ECR_REGISTRY}:${dockerImageTag} '
+            }
+        }
+    }
+
+}
+
+
